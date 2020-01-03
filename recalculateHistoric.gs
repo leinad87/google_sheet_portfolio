@@ -8,7 +8,13 @@ function recalculateHistoric () {
     var historics = {}
     var marketsByCountry = getMarketsByCountry();
     var currencyTickers = getCurrencyTickers();
-
+  
+    var historicSheet = ss.getSheetByName("Histórico");
+    
+    // Clear historic sheet
+    historicSheet.insertRowsAfter(historicSheet.getMaxRows(), 1)  // Add empty row to avoid loss styles
+    historicSheet.deleteRows(2, historicSheet.getMaxRows() - 2);
+  
     var my_historic = {};
     for (var i = 1; i < values.length; i++) {
         if (values[i][1] == "Dividendo" || values[i][1] == "") continue;
@@ -41,7 +47,7 @@ function recalculateHistoric () {
             while (+day < +next_day) {
 
                 if (!my_historic.hasOwnProperty(day)) {
-                    my_historic[day] = { 'input': 0, 'value': 0, 'ibex': 0, 'sp500': 0, 'eur600': 0 }
+                    my_historic[day] = { 'input': 0, 'value': 0 }
                 }
 
 
@@ -55,18 +61,12 @@ function recalculateHistoric () {
                 if (+day === +operation_date) {
                     my_historic[day] = {
                         'input': my_historic[day].input + operation_cost,
-                        'value': my_historic[day].value + (operation_actions * historics[row[5]].close[j]) / currency_price,
-                        'ibex': 0,
-                        'sp500': 0,
-                        'eur600': 0
+                        'value': my_historic[day].value + (operation_actions * historics[row[5]].close[j]) / currency_price
                     }
                 } else if (+day >= +operation_date) {
                     my_historic[day] = {
                         'input': my_historic[day].input,
-                        'value': my_historic[day].value + (operation_actions * historics[row[5]].close[j]) / currency_price,
-                        'ibex': 0,
-                        'sp500': 0,
-                        'eur600': 0
+                        'value': my_historic[day].value + (operation_actions * historics[row[5]].close[j]) / currency_price
                     }
                 }
               
@@ -82,14 +82,7 @@ function recalculateHistoric () {
     addMarketData(getHistoric("%5EGSPC", values[1][2] / 1000), "sp500", my_historic);
     addMarketData(getHistoric("%5ESTOXX", values[1][2] / 1000), "eur600", my_historic);
 
-
-    var historicSheet = ss.getSheetByName("Histórico");
-
-    // Add empty row to avoid loss styles
-    historicSheet.insertRowsAfter(historicSheet.getLastRow(), 1)
-
-    historicSheet.deleteRows(2, historicSheet.getLastRow() - 1);
-
+    var table = []
     var i = 1;
     for (var key in my_historic) {
         while (true) { // PFFFFFFF to improve
@@ -98,25 +91,24 @@ function recalculateHistoric () {
             appendArray = []
             appendArray.push(day.getDate() + "/" + (day.getMonth() + 1) + "/" + day.getFullYear())
             appendArray.push(my_historic[key].input == 0 ? "" : my_historic[key].input);
-            appendArray.push(my_historic[key].value);
+            appendArray.push(my_historic[key].value != null ? my_historic[key].value : "=C"+(i-1));
             appendArray.push((i == 2) ? '=C2/E2' : '=if(B' + i + '="";D' + (i - 1) + ';C' + i + '/E' + i + ')');
             appendArray.push((i == 2) ? 100 : '=if(B' + i + '="";C' + i + '/D' + i + ';E' + (i - 1) + ')');
             appendArray.push((i == 2) ? '' : '=(E' + i + '-E' + (i - 1) + ')/E' + (i - 1));
             appendArray.push('')
-            appendArray.push(my_historic[key].ibex)
+            appendArray.push(my_historic[key].ibex != null ? my_historic[key].ibex:"=H"+(i-1))
             appendArray.push((i == 2) ? 100 : '=I' + (i - 1) + '*(1+J' + i + ')');
             appendArray.push((i == 2) ? '' : '=(H' + i + '-H' + (i - 1) + ')/H' + (i - 1));
             appendArray.push('');
-            appendArray.push(my_historic[key].sp500)
+            appendArray.push(my_historic[key].ibex != null ? my_historic[key].sp500:"=L"+(i-1))
             appendArray.push((i == 2) ? 100 : '=M' + (i - 1) + '*(1+N' + i + ')');
             appendArray.push((i == 2) ? '' : '=(L' + i + '-L' + (i - 1) + ')/L' + (i - 1));
             appendArray.push('');
-            appendArray.push(my_historic[key].eur600)
+            appendArray.push(my_historic[key].ibex != null ? my_historic[key].erur600:"=P"+(i-1))
             appendArray.push((i == 2) ? 100 : '=Q' + (i - 1) + '*(1+R' + i + ')');
             appendArray.push((i == 2) ? '' : '=(P' + i + '-P' + (i - 1) + ')/P' + (i - 1));
 
-
-            historicSheet.appendRow(appendArray);
+            table.push(appendArray);
 
             if (my_historic[key].input != 0) {
                 my_historic[key].input = 0;
@@ -125,6 +117,11 @@ function recalculateHistoric () {
             }
         }
     }
+  
+    // Write result in the sheet
+    historicSheet.insertRowsAfter(historicSheet.getMaxRows(), table.length);
+    var range = historicSheet.getRange(2, 1, table.length, table[0].length);
+    range.setValues(table);
 }
 
 function addMarketData (data, market, my_historic) {
