@@ -8,21 +8,37 @@ function recalculateHistoric () {
     var historics = {}
     var marketsByCountry = getMarketsByCountry();
     var currencyTickers = getCurrencyTickers();
-  
+
     var historicSheet = ss.getSheetByName("Histórico");
-    
+
     // Clear historic sheet
     historicSheet.insertRowsAfter(historicSheet.getMaxRows(), 1)  // Add empty row to avoid loss styles
     historicSheet.deleteRows(2, historicSheet.getMaxRows() - 2);
-  
+
     var my_historic = {};
     for (var i = 1; i < values.length; i++) {
-        if (values[i][1] == "Dividendo" || values[i][1] == "") continue;
+
+        // Empty row?
+        if (values[i][1] == "") continue;
 
         var row = values[i];
         var operation_date = getDayFromDate(row[2]);
-        var operation_actions = (row[1] == "Venta") ? row[8] * -1 : row[8] * 1;
-        var operation_cost = row[13];
+        var operation_actions, operation_cost;
+        switch (row[1]) {
+            case "Venta":
+                operation_actions = -1 * row[8];
+                operation_cost = row[13];
+                break;
+            case "Dividendo":
+                operation_actions = 0;
+                operation_cost = -1 * row[13];
+                break;
+            case "Compra":
+            case "Script":
+                operation_actions = row[8];
+                operation_cost = row[13];
+                break;
+        }
 
         // Get symbol historic if not gathered yet
         if (!historics.hasOwnProperty(row[5])) {
@@ -52,10 +68,10 @@ function recalculateHistoric () {
 
 
                 var currency_price = row[7] == "€" ? 1 : historics[row[7]].close[j];
-                var tmp = j-1;
-                while( currency_price == null){
+                var tmp = j - 1;
+                while (currency_price == null) {
                     currency_price = historics[row[7]].close[tmp];
-                    tmp = tmp -1;
+                    tmp = tmp - 1;
                 }
 
                 if (+day === +operation_date) {
@@ -69,7 +85,7 @@ function recalculateHistoric () {
                         'value': my_historic[day].value + (operation_actions * historics[row[5]].close[j]) / currency_price
                     }
                 }
-              
+
                 day.setDate(day.getDate() + 1)
                 day = getDayFromDate(day)
             }
@@ -91,20 +107,20 @@ function recalculateHistoric () {
             appendArray = []
             appendArray.push(day.getDate() + "/" + (day.getMonth() + 1) + "/" + day.getFullYear())
             appendArray.push(my_historic[key].input == 0 ? "" : my_historic[key].input);
-            appendArray.push(my_historic[key].value != null ? my_historic[key].value : "=C"+(i-1));
+            appendArray.push(my_historic[key].value != null ? my_historic[key].value : "=C" + (i - 1));
             appendArray.push((i == 2) ? '=C2/E2' : '=if(B' + i + '="";D' + (i - 1) + ';C' + i + '/E' + i + ')');
             appendArray.push((i == 2) ? 100 : '=if(B' + i + '="";C' + i + '/D' + i + ';E' + (i - 1) + ')');
             appendArray.push((i == 2) ? '' : '=(E' + i + '-E' + (i - 1) + ')/E' + (i - 1));
             appendArray.push('')
-            appendArray.push(my_historic[key].ibex != null ? my_historic[key].ibex:"=H"+(i-1))
+            appendArray.push(my_historic[key].ibex != null ? my_historic[key].ibex : "=H" + (i - 1))
             appendArray.push((i == 2) ? 100 : '=I' + (i - 1) + '*(1+J' + i + ')');
             appendArray.push((i == 2) ? '' : '=(H' + i + '-H' + (i - 1) + ')/H' + (i - 1));
             appendArray.push('');
-            appendArray.push(my_historic[key].ibex != null ? my_historic[key].sp500:"=L"+(i-1))
+            appendArray.push(my_historic[key].ibex != null ? my_historic[key].sp500 : "=L" + (i - 1))
             appendArray.push((i == 2) ? 100 : '=M' + (i - 1) + '*(1+N' + i + ')');
             appendArray.push((i == 2) ? '' : '=(L' + i + '-L' + (i - 1) + ')/L' + (i - 1));
             appendArray.push('');
-            appendArray.push(my_historic[key].ibex != null ? my_historic[key].eur600:"=P"+(i-1))
+            appendArray.push(my_historic[key].ibex != null ? my_historic[key].eur600 : "=P" + (i - 1))
             appendArray.push((i == 2) ? 100 : '=Q' + (i - 1) + '*(1+R' + i + ')');
             appendArray.push((i == 2) ? '' : '=(P' + i + '-P' + (i - 1) + ')/P' + (i - 1));
 
@@ -117,7 +133,7 @@ function recalculateHistoric () {
             }
         }
     }
-  
+
     // Write result in the sheet
     historicSheet.insertRowsAfter(historicSheet.getMaxRows(), table.length);
     var range = historicSheet.getRange(2, 1, table.length, table[0].length);
