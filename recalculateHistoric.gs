@@ -217,6 +217,13 @@ function getHistoric (symbol, since) {
     var url = "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol + "?symbol=" + symbol + "&period1=" + since + "&period2=" + today + "&interval=1d&includePrePost=true&events=div%7Csplit%7Cearn&lang=es-ES&region=ES&crumb=xBNPEtxqGjk&corsDomain=es.finance.yahoo.com";
 
     var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    var json = JSON.parse(response.getContentText());
-    return { "timestamp": json.chart.result["0"].timestamp, "close": json.chart.result["0"].indicators.quote["0"].close };
+
+    var responseBody = response.getContentText();
+    var responseCode = response.getResponseCode();
+    if (responseCode === 200) {
+        var json = JSON.parse(responseBody);
+        return { "timestamp": json.chart.result["0"].timestamp, "close": json.chart.result["0"].indicators.quote["0"].close };
+    } else {
+        throw (Utilities.formatString("Request failed. Expected 200, got %d: %s. URL: %s", responseCode, responseBody, url));
+    }
 }
