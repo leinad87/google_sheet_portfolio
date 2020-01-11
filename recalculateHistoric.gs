@@ -7,7 +7,6 @@ function recalculateHistoric () {
 
     var historics = {}
     var marketsByCountry = getMarketsByCountry();
-    var currencyTickers = getCurrencyTickers();
 
     var historicSheet = ss.getSheetByName("Histórico");
 
@@ -45,9 +44,11 @@ function recalculateHistoric () {
             historics[row[5]] = getHistoric(row[5] + marketsByCountry[row[6]], row[2] / 1000);
         }
 
+        var symbolCurrency = historics[row[5]].currency;
+
         // Get currency exchange
-        if (row[7] != "€" && !historics.hasOwnProperty(row[7])) {
-            historics[row[7]] = getHistoric(currencyTickers[row[7]] + "%3DX", row[2] / 1000);
+        if (symbolCurrency != "EUR" && !historics.hasOwnProperty(symbolCurrency)) {
+            historics[symbolCurrency] = getHistoric(symbolCurrency + "%3DX", row[2] / 1000);
         }
 
         for (var j = 0; j < historics[row[5]].timestamp.length; j++) {
@@ -67,12 +68,17 @@ function recalculateHistoric () {
                 }
 
 
-                var currency_price = row[7] == "€" ? 1 : historics[row[7]].close[j];
+                var currency_price = symbolCurrency == "EUR" ? 1 : historics[symbolCurrency].close[j];
                 var tmp = j - 1;
                 while (currency_price == null) {
-                    currency_price = historics[row[7]].close[tmp];
+                    currency_price = historics[symbolCurrency].close[tmp];
                     tmp = tmp - 1;
                 }
+
+                if (symbolCurrency == "GBp" && row[7] == "£") {
+                    currency_price = currency_price * 100;
+                }
+
 
                 if (+day === +operation_date) {
                     my_historic[day] = {
@@ -176,21 +182,6 @@ function getMarketsByCountry () {
     return markets;
 }
 
-function getCurrencyTickers () {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var calsheet = ss.getSheetByName("Cálculo");
-    var source = calsheet.getRange("3:5");
-    var values = source.getValues();
-
-    var tickers = {};
-    for (var i = 1; i < values[0].length; i++) {
-        tickers[values[0][i]] = values[2][i];
-    }
-
-    return tickers;
-
-}
-
 
 function formatDate (date) {
     // https://stackoverflow.com/a/23593099/710162
@@ -222,7 +213,11 @@ function getHistoric (symbol, since) {
     var responseCode = response.getResponseCode();
     if (responseCode === 200) {
         var json = JSON.parse(responseBody);
-        return { "timestamp": json.chart.result["0"].timestamp, "close": json.chart.result["0"].indicators.quote["0"].close };
+        return {
+            "timestamp": json.chart.result["0"].timestamp,
+            "close": json.chart.result["0"].indicators.quote["0"].close,
+            "currency": json.chart.result["0"].meta.currency
+        };
     } else {
         throw (Utilities.formatString("Request failed. Expected 200, got %d: %s. URL: %s", responseCode, responseBody, url));
     }
